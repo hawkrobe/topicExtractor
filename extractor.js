@@ -9,7 +9,7 @@ function topicl(classHandle, options) {
   var documents = classInstanceArr.map(function(classInstance) {
 
     // Pull out list of words from class instance
-    var words = classInstance.innerHTML.split(/[ ,.–:;()]+/);
+    var words = classInstance.innerHTML.split(/[ ,.–:;()?"]+/);
 
     // Strip words of html tags & punctuation, remove empty strings
     return words.map(function(word) {
