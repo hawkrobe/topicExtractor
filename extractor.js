@@ -14,9 +14,9 @@ function topicl(classHandle, options) {
     // Strip words of html tags & punctuation, remove empty strings
     return words.map(function(word) {
       return stripWord(word);
-    }).filter(Boolean); 
+    }).filter(Boolean);
   });
-  
+
   return documents;
 };
 
@@ -26,3 +26,22 @@ function stripWord(word) {
     .replace(/[’\/{}=\_`~]/g,"")  // Strip out within-word punctuation
     .replace("&amp", ""); // Strip out weird ampersand thing
 };
+
+function wordsToIndices(documents) {
+  var dict = {}
+  var index = 0
+
+  var documentsByIndex = documents.map(function(doc){
+    return doc.map(function(word) {
+      if (dict[word] === undefined) {
+        dict[word] = index
+        index++
+      }
+      return dict[word]
+    })
+  })
+
+  console.log("Number of unique words: "+index)
+
+  return {dict: dict, documents: documentsByIndex}
+}
