@@ -1,0 +1,7 @@
+{
+  "name": "wppl-topics",
+  "webppl": {
+    "wppl": ["lda.wppl"],
+  },
+  "main": "extractor.js"
+}
