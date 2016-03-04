@@ -1,0 +1,3 @@
+// Run in browser, with webppl-topics included in the browserified webppl.min.js
+var data = wpplTopics.extractDocuments("abstract");
+lda(data);
