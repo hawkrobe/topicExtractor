@@ -46,6 +46,7 @@ function wordsToIndices(documents) {
   return {
     dict: dict,
     documents: documentsByIndex,
-    origDocuments: documents
+    origDocuments: documents,
+    numWords : index
   };
 }
