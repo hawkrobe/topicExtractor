@@ -1,0 +1,64 @@
+// Parameters
+
+var topics = {
+  'topic1': null,
+  'topic2': null
+};
+
+var lda = function(data) {
+  var vocabulary = _.range(data.numWords);
+  var docs = data.documents;
+  
+  // Constants and helper functions
+
+  var ones = function(n) {
+    return repeat(n, function() {return 1.0;});
+  };
+
+  // Model
+
+  var makeWordDist = function() {
+    return dirichlet(ones(vocabulary.length));
+  };
+
+  var makeTopicDist = function() {
+    return dirichlet(ones(_.size(topics)));
+  };
+
+  var discreteFactor = function(vs, ps, v) {
+    var i = indexOf(v, vs);
+    factor(Math.log(ps[i]));
+  };
+
+  var model = function() {
+
+    var wordDistForTopic = mapObject(makeWordDist, topics);
+    var topicDistForDoc = mapObject(makeTopicDist, docs);
+    var makeTopicForWord = function(docName, word) {
+      var i = discrete(topicDistForDoc[docName]);
+      return _.keys(topics)[i];
+    };
+    var makeWordTopics = function(docName, words) {
+      return map(function(word) {return makeTopicForWord(docName, word);},
+		 words);
+    };
+    var topicsForDoc = mapObject(makeWordTopics, docs);
+
+    mapObject(
+      function(docName, words) {
+        map2(
+          function(topic, word) {
+            discreteFactor(vocabulary, wordDistForTopic[topic], word);
+          },
+          topicsForDoc[docName],
+          words);
+      },
+      docs);
+
+    // console.log(wordDistForTopic);
+
+    return wordDistForTopic
+  };
+
+  return MH(model, 10000);
+};
