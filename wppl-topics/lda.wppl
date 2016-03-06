@@ -2,7 +2,11 @@
 
 var topics = {
   'topic1': null,
-  'topic2': null
+  'topic2': null,
+  'topic3': null,
+  'topic4': null,
+  'topic5': null,
+  'topic6': null
 };
 
 var lda = function(data) {
@@ -31,7 +35,7 @@ var lda = function(data) {
   };
 
   var model = function() {
-
+    console.log("running model");
     var wordDistForTopic = mapObject(makeWordDist, topics);
     var topicDistForDoc = mapObject(makeTopicDist, docs);
     var makeTopicForWord = function(docName, word) {
@@ -55,10 +59,9 @@ var lda = function(data) {
       },
       docs);
 
-    // console.log(wordDistForTopic);
-
-    return wordDistForTopic
+    return wordDistForTopic;
   };
-
-  return MH(model, 10000);
+  var results = IncrementalMH(model, 10000, {verbose: true, onlyMAP : true});
+  console.log("done running MH");
+  return wpplTopics.topTenWords(results, data);
 };
