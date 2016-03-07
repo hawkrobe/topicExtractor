@@ -1,4 +1,4 @@
-// Run this browser, with webppl-topics included in the browserified webppl.min.js
+// Run this in the browser, with webppl-topics included in the browserified webppl.min.js
 var program = ("var data = wpplTopics.extractDocuments('abstract');" +
 	       "var results = lda(data);" +
 	       "console.log(results);");
