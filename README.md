@@ -14,7 +14,7 @@ Components
 	* Clean: take each dom element, strip out junk html, punctuation, stop words, and words appearing only one or two times.
 	* Tokenize: make a dictionary from tokens to index numbers, turn documents into indices. 
 
-* ```infer(corpus)``: run LDA over the tokenized corpus to get topic vectors and docTopic vectors.
+* ```infer(corpus)```: run LDA over the tokenized corpus to get topic vectors and docTopic vectors.
 	* Works for MH and Variational (in small batches). 
 	* Collapsed LDA is implemented, but very slow.
 	* Extract the relevant info from webppl inference.
