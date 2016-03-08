@@ -1,0 +1,119 @@
+// Dirichlet-discrete with sample, observe & getCount (could go in webppl header) 
+var scoreLookup = cache(function(val, pc) {
+  return discreteERP.score([normalize(pc)], val);
+});
+
+var makeDirichletDiscrete = function(pseudocounts) {
+  var addCount = function(a, i, j) {
+    var j = j == undefined ? 0 : j;
+    if (a.length == 0) {
+      return [];
+    } else {
+      return [a[0] + (i == j)].concat(addCount(a.slice(1), i, j + 1));
+    }
+  };
+  globalStore.DDindex = 1 + (globalStore.DDindex == undefined ? 0 : globalStore.DDindex);
+  var ddname = 'DD' + globalStore.DDindex;
+  globalStore[ddname] = pseudocounts;
+  var ddSample = function() {
+    var pc = globalStore[ddname];  // get current sufficient stats
+    var val = sample(discreteERP, [pc]);  // sample from predictive.
+    globalStore[ddname] = addCount(pc, val); // update sufficient stats
+    return val;
+  };
+  var ddObserve = function(val) {
+    var pc = globalStore[ddname];  // get current sufficient stats
+    factor(scoreLookup(val, pc));
+    // score based on predictive distribution (normalize counts)
+    globalStore[ddname] = addCount(pc, val); // update sufficient stats
+  };
+  var ddCounts = function() {
+    return globalStore[ddname];
+  };
+  return {
+    'sample': ddSample,
+    'observe': ddObserve,
+    'getCounts': ddCounts
+  };
+};
+			
+var indexLookup = cache(function(v, vs) {
+  return indexOf(v, vs);
+});
+
+var dirichletDiscreteFactor = function(vs, dd, v) { // NEW
+  var i = indexLookup(v, vs);
+  var observe = dd.observe;
+  observe(i);
+};
+
+// Parameters
+
+var topics = {
+  'topic1': null,
+  'topic2': null,
+  'topic3': null,
+  'topic4': null,
+  'topic5': null,
+  'topic6': null
+};
+
+var lda = function(data) {
+  var vocabulary = _.range(data.numWords);
+  var docs = data.documents;
+  
+  // Constants and helper functions
+
+  var ones = function(n) {
+    return repeat(n, function() {return 1.0;});
+  };
+
+  // Model
+
+  var makeWordDist = function() {
+    return makeDirichletDiscrete(ones(vocabulary.length)); // NEW
+  };
+
+  var makeTopicDist = function() {
+    return makeDirichletDiscrete(ones(_.size(topics))); // NEW
+  };
+
+  var model = function() {
+    console.log("running model");
+    var wordDistForTopic = mapObject(makeWordDist, topics);
+    var topicDistForDoc = mapObject(makeTopicDist, docs);
+    var makeTopicForWord = function(docName, word) {
+      var sampleDD = topicDistForDoc[docName].sample; 
+      var i = sampleDD(); 
+      return _.keys(topics)[i];
+    };
+    
+    var makeWordTopics = function(docName, words) {
+      return map(function(word) {return makeTopicForWord(docName, word);},
+		 words);
+    };
+    var topicsForDoc = mapObject(makeWordTopics, docs);
+    mapObject(
+      function(docName, words) {
+        map2(
+          function(topic, word) {
+	    dirichletDiscreteFactor(vocabulary, wordDistForTopic[topic], word); // NEW
+          },
+          topicsForDoc[docName],
+          words);
+      },
+      docs);
+
+    // Print out pseudecounts of (dirichlet-discrete) word distributions for topics
+    var topicList = _.keys(topics);
+    var counts = map(function(topic) {
+      var getCount = wordDistForTopic[topic].getCounts;
+      return getCount();
+    }, topicList);
+    return counts;
+  };
+  
+  var results = MCMC(model, {samples: 100, verbose: true, onlyMAP : true});
+  console.log("done running MH");
+  return wpplTopics.topTenWords(results, data);
+};
