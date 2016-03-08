@@ -49,16 +49,11 @@ comments on variational from my explorations (these belong somewhere else):
 
 var ones = function(dims) { zeros(dims).add(1); };
 
-// TODO: Add these helpers to header.wppl if useful.
-var forEach2 = function(xs, f) {
+var forEach2 = function(f, xs) {
   map(function(i) {
     return f(xs[i], i);
   }, _.range(xs.length));
   return;
-};
-
-var times = function(n, f) {
-  forEach2(_.range(n), f);
 };
 
 var paramInit = function(val, options) {
@@ -72,6 +67,7 @@ var erp = { logistic: logistic };
 var initSigma = 0.05;
 var hDim = 10;
 
+//TODO: do some profiling. why is this slow?
 
 var lda = function(corpus, vocabSize, numTopics, alpha, eta) {
 
@@ -84,52 +80,44 @@ var lda = function(corpus, vocabSize, numTopics, alpha, eta) {
     return sample(dirichletERP, [eta], { guideVal: q }); // beta_k
   });
 
-  // var W0 = paramChoice(matrixGaussianERP, [0, initSigma, [hDim, vocabSize]], { name: 'W0' });
-  // var W1 = paramChoice(matrixGaussianERP, [0, initSigma, [numTopics - 1, hDim]], { name: 'W1' });
-  // var W2 = paramChoice(matrixGaussianERP, [0, initSigma, [numTopics - 1, hDim]], { name: 'W2' });
-  // var b0 = paramChoice(matrixGaussianERP, [0, initSigma, [hDim, 1]], { name: 'b0' });
-  // var b1 = paramChoice(matrixGaussianERP, [0, initSigma, [numTopics - 1, 1]], { name: 'b1' });
-  // var b2 = paramChoice(matrixGaussianERP, [0, initSigma, [numTopics - 1, 1]], { name: 'b2' });
+  //TODO: think about better init?
+  var W0 = paramChoice(matrixGaussianERP, [0, initSigma, [hDim, vocabSize]], { name: 'W0' });
+  var W1 = paramChoice(matrixGaussianERP, [0, initSigma, [numTopics - 1, hDim]], { name: 'W1' });
+  var W2 = paramChoice(matrixGaussianERP, [0, initSigma, [numTopics - 1, hDim]], { name: 'W2' });
+  var b0 = paramChoice(matrixGaussianERP, [0, initSigma, [hDim, 1]], { name: 'b0' });
+  var b1 = paramChoice(matrixGaussianERP, [0, initSigma, [numTopics - 1, 1]], { name: 'b1' });
+  var b2 = paramChoice(matrixGaussianERP, [0, initSigma, [numTopics - 1, 1]], { name: 'b2' });
 
   miniBatch(corpus, function(doc) {
 
-    //FIXME: this won't work well as-is because each doc has separate params that are rarely updated.
-    //TODO: make a summary vector of the document (counts or embeddings?), feed into q nn.
-    //TODO: make vocab smaller by removing words that only occur once or twice?
-    //TODO: do some profiling. why is this slow?
+    //neural guide: use a NN with the word-count vector for the document as input that spits out the props_mu and props_log_sigma for the logisticNormal guide.
+    //a fancy modern way to do this woulld be to convert words to vectors via a (learned) embedding and then use an RNN to build the doc vector from which we get mu and sigma.... not sure this would actually do better than the count-vector method.
+    var docTensor = ad.tensor.reshape({data:doc, length:doc.length},[vocabSize,1])
+    var h = ad.tensor.tanh(ad.tensor.add(ad.tensor.dot(W0, docTensor), b0));
+    var mu = ad.tensor.add(ad.tensor.dot(W1, h), b1);
+    var log_sigma = ad.tensor.exp(ad.tensor.add(ad.tensor.dot(W2, h), b2));
+    var q = sampleGuide(logisticNormalERP, [mu, ad.tensor.exp(log_sigma)]);
 
-    // //neural guide: use a NN with the word-count vector for the document as input that spits out the props_mu and props_log_sigma for the logisticNormal guide.
-    // //a fancy modern way to do this woulld be to convert words to vectors via a (learned) embedding and then use an RNN to build the doc vector from which we get mu and sigma.... not sure this would actually do better than the count-vector method.
-    // var docTensor = ad.tensor.reshape({data:doc, length:doc.length},[vocabSize,1])
-    // var h = ad.tensor.tanh(ad.tensor.add(ad.tensor.dot(W0, docTensor), b0));
-    // var mu = ad.tensor.add(ad.tensor.dot(W1, h), b1);
-    // var log_sigma = ad.tensor.exp(ad.tensor.add(ad.tensor.dot(W2, h), b2));
-    // var q = sampleGuide(logisticNormalERP, [mu, ad.tensor.exp(log_sigma)]);
-
-    //version without the NN guide:
-    var q = sampleGuide(logisticNormalERP, [
-      paramInit(zeros([numTopics - 1, 1]), { prefix: 'props_mu' }),
-      ad.tensor.exp(paramInit(zeros([numTopics - 1, 1]), { prefix: 'props_log_sigma' }))
-    ]);
+    // //version without the NN guide:
+    // var q = sampleGuide(logisticNormalERP, [
+    //   paramInit(zeros([numTopics - 1, 1]), { prefix: 'props_mu' }),
+    //   ad.tensor.exp(paramInit(zeros([numTopics - 1, 1]), { prefix: 'props_log_sigma' }))
+    // ]);
 
     var topicDist = sample(dirichletERP, [alpha], { guideVal: q }); // theta_d
 
     var marginal = Enumerate(function() {
+      //TODO: what happens if we relax this? first write via one-hot repr for z, which turns index lookup into matrix multiply. Then relax the one-hot from discrete into a vec from dirichlet... 
       var z = sample(discreteERP, [topicDist]);
       var topic = topics[z];
       var word = sample(discreteERP, [topic]);
       return word;
     });
 
+    // faster way to do this? only do factor if count!=0?
+    map(function(i){factor(doc[i]*marginal.score([], i))}, wordIndices)
 
-    // avoid the map recursion?
-    map(
-      function(word) {
-        factor(marginal.score([], word));
-      },
-      doc);
-
-  }, {batchSize: 2, selectionMethod: 'random'});
+  }, {batchSize: 3, selectionMethod: 'random'});
 
   return topics;
 
@@ -141,25 +129,25 @@ var lda = function(corpus, vocabSize, numTopics, alpha, eta) {
 
 var corpus = readJSON('cocolabAbstractCorpusIndices.json');
 
-var docs = corpus.documents
+//use count vectors for now...
+var docs = corpus.documentsAsCounts
 
-var vocabSize = 2834; // V
+var vocabSize = docs[0].length; // V
+var wordIndices = _.range(0,vocabSize)
 var numTopics = 4; // K
+
 
 // Parameter for prior on topic proportions.
 var alpha = Vector(repeat(numTopics, constF(0.1)));
 // Parameter for prior on topics.
 var eta = Vector(repeat(vocabSize, constF(0.1)));
 
-
-
 var marginal = Variational(function() {
-  return lda(docs, vocabSize, numTopics, alpha, eta);
-}, {
+    return lda(docs, vocabSize, numTopics, alpha, eta);
+  }, {
   optimizer: { adagrad: { stepSize: 0.1 } },
   //optimizer: { adam: { stepSize: 0.01 } },
-  steps: 100,
-  miniBatchSize: 1,
+  steps: 2,
   samplesPerStep: 1,
   returnSamples: 1,
   callback: function(i, parameters) {
@@ -172,14 +160,6 @@ var marginal = Variational(function() {
     //               parameters.topic_log_sigma1,
     //               parameters.topic_log_sigma2,
     //               parameters.topic_log_sigma3];
-
-    // The topics used to generate the bars2 data are 2x2 horizontal
-    // and vertical stripes.
-
-    // [.5, .5, .0, .0]
-    // [.0, .0, .5, .5]
-    // [.5, .0, .5, .0]
-    // [.0, .5, .0, .5]
 
     display(_.map(mus, logistic));
     //display(_.map(sigmas, ad.tensor.exp));

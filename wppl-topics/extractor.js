@@ -1,7 +1,7 @@
 function extractDocuments(classHandle, options) {
   // Initialize variables
   var wordCountDict = {};
-  
+
   // Extract raw classes
   var classInstancesRaw = document.getElementsByClassName(classHandle);
 
@@ -30,7 +30,7 @@ function extractDocuments(classHandle, options) {
   var commonWords = _.filter(_.keys(wordCountDict), function(key) {
     return wordCountDict[key] > 2;
   });
-  
+
   return wordsToIndices(documents, commonWords);
 };
 
@@ -59,18 +59,28 @@ function wordsToIndices(documents, commonWords) {
       } else {
 	return "nullWord";
       }
-    }).filter(function(x){return x != "nullWord";}); 
+    }).filter(function(x){return x != "nullWord";});
   });
-  
+
   console.log("Number of unique words: " + (index - 1));
-  
+
   return {
     wordToIndexDict: wordToIndexDict,
     indexToWordDict: indexToWordDict,
     documents: documentsByIndex,
+    documentsAsCounts: docsAsCounts(documentsByIndex,index),
     origDocuments: documents,
     numWords : index
   };
+}
+
+function docsAsCounts(docs, numWords) {
+  return docs.map(function(doc){
+    //init count vector to zeros
+    var counts = _.range(0, numWords, 0)
+    doc.forEach(function(v,i){counts[v]++})
+    return counts
+  })
 }
 
 function topTenWords(mhResults, data){
@@ -78,7 +88,7 @@ function topTenWords(mhResults, data){
   var mapVal = mhResults.hist[mapKey].val;
   return _.mapObject(mapVal, function(weights, topic) {
     var sortedWeights = _.sortBy(weights, function(num){return num;}).slice(-10);
-    console.log("sorted weights" + sortedWeights);    
+    console.log("sorted weights" + sortedWeights);
     sortedWeights.reverse();
     console.log("sliced & reversed:" + sortedWeights);
     return sortedWeights.map(function(val) {
