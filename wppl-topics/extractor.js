@@ -77,10 +77,10 @@ function wordsToIndices(documents, commonWords) {
 function docsAsCounts(docs, numWords) {
   return docs.map(function(doc){
     //init count vector to zeros
-    var counts = _.range(0, numWords, 0)
-    doc.forEach(function(v,i){counts[v]++})
-    return counts
-  })
+    var counts = _.range(0, numWords, 0).map(_.constant(0));
+    doc.forEach(function(v,i){counts[v]++;});
+    return counts;
+  });
 }
 
 function topTenWords(mhResults, data){
@@ -88,9 +88,8 @@ function topTenWords(mhResults, data){
   var mapVal = mhResults.hist[mapKey].val;
   return _.mapObject(mapVal, function(weights, topic) {
     var sortedWeights = _.sortBy(weights, function(num){return num;}).slice(-10);
-    console.log("sorted weights" + sortedWeights);
+    // Flip so top weight is first
     sortedWeights.reverse();
-    console.log("sliced & reversed:" + sortedWeights);
     return sortedWeights.map(function(val) {
       // Get index in list, then get corresponding word
       return data.indexToWordDict[_.indexOf(weights, val)];
