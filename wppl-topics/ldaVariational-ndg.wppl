@@ -69,7 +69,7 @@ var hDim = 10;
 
 //TODO: do some profiling. why is this slow?
 
-var lda = function(corpus, vocabSize, numTopics, alpha, eta) {
+var lda = function(corpus, vocabSize, wordIndices, numTopics, alpha, eta) {
 
   var topics = repeat(numTopics, function() {
     var q = sampleGuide(logisticNormalERP, [
@@ -107,15 +107,15 @@ var lda = function(corpus, vocabSize, numTopics, alpha, eta) {
     var topicDist = sample(dirichletERP, [alpha], { guideVal: q }); // theta_d
 
     var marginal = Enumerate(function() {
-      //TODO: what happens if we relax this? first write via one-hot repr for z, which turns index lookup into matrix multiply. Then relax the one-hot from discrete into a vec from dirichlet... 
+      //TODO: what happens if we relax this? first write via one-hot repr for z, which turns index lookup into matrix multiply. Then relax the one-hot from discrete into a vec from dirichlet...
       var z = sample(discreteERP, [topicDist]);
       var topic = topics[z];
       var word = sample(discreteERP, [topic]);
       return word;
     });
 
-    // faster way to do this? only do factor if count!=0?
-    map(function(i){factor(doc[i]*marginal.score([], i))}, wordIndices)
+    // faster way to do this?
+    map(function(i){if(doc[i]>0){factor(doc[i]*marginal.score([], i))}}, wordIndices)
 
   }, {batchSize: 3, selectionMethod: 'random'});
 
@@ -127,7 +127,7 @@ var lda = function(corpus, vocabSize, numTopics, alpha, eta) {
 // Each document is represented by an array of word counts. Therefore
 // doc.length == vocabSize, and sum(doc) = no. of words in doc.
 
-var corpus = readJSON('cocolabAbstractCorpusIndices.json');
+var corpus = readJSON('testData/cocolabAbstractCorpus.json');
 
 //use count vectors for now...
 var docs = corpus.documentsAsCounts
@@ -143,11 +143,11 @@ var alpha = Vector(repeat(numTopics, constF(0.1)));
 var eta = Vector(repeat(vocabSize, constF(0.1)));
 
 var marginal = Variational(function() {
-    return lda(docs, vocabSize, numTopics, alpha, eta);
+    return lda(docs, vocabSize, wordIndices, numTopics, alpha, eta);
   }, {
   optimizer: { adagrad: { stepSize: 0.1 } },
   //optimizer: { adam: { stepSize: 0.01 } },
-  steps: 2,
+  steps: 100,
   samplesPerStep: 1,
   returnSamples: 1,
   callback: function(i, parameters) {
@@ -155,6 +155,8 @@ var marginal = Variational(function() {
                parameters.topic_mu1,
                parameters.topic_mu2,
                parameters.topic_mu3];
+
+    
 
     // var sigmas = [parameters.topic_log_sigma0,
     //               parameters.topic_log_sigma1,
