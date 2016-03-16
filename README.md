@@ -22,6 +22,24 @@ Components
 * ```display(ldaResults)```: TODO: create/insert a dom element that shows the topics.
 	* Re-order: make a helper function that re-orders (or re-colors or such) the target dom elements when a user clicks on a topic.
 
+Compiling for Browser
+---------------------
+To bundle our webppl package with the core webppl library for use in the browser, use 
+
+```
+grunt compile:path/to/wppl-topics
+```
+
+in your local webppl directory, as described [here](http://docs.webppl.org/en/master/development/workflow.html#packages). After adding the compiled file `webppl.min.js` to the header of your webpage HTML, you can call functions from the package by using `webppl.run()` in your JavaScript code (e.g. on button press or page load):
+
+```{js}
+var program = ("var data = wpplTopics.extractDocuments('<DOM Class>');" +
+               "var results = lda(data);" +
+               "console.log(results);");
+
+webppl.run(program, function(s, erp) { console.log("done"); });
+```
+
 To-do
 -----------
 
